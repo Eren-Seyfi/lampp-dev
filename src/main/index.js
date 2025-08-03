@@ -1,94 +1,82 @@
 // Electron modüllerini içe aktar
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 
-// Dosya yolu işlemleri için 'path' modülünden 'join' fonksiyonu alınır
+// Dosya yollarını birleştirmek için 'path' modülünden 'join' fonksiyonu alınır
 import { join } from 'path'
 
 // Electron Toolkit yardımcıları: geliştirme kontrolü, kısayol izleme, vs.
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
-// Uygulama güncellemeleri için electron-updater modülünden autoUpdater alınır
-import { autoUpdater } from 'electron-updater'
-
-// Uygulama simgesi import edilir (Vite sayesinde bu şekilde çağrılır)
+// Uygulama simgesi (Vite sayesinde bu şekilde çağrılır)
 import icon from '../../resources/icon.png?asset'
 
-// Ana pencereyi oluşturacak fonksiyon
+// 🔄 Güncelleyici modülünü dahil et (ayrı dosyada!)
+import { initAutoUpdater } from './update'
 
+// Ana pencereyi oluşturacak fonksiyon
 function createWindow() {
-  // Yeni bir tarayıcı penceresi oluştur
   const mainWindow = new BrowserWindow({
-    width: 900, // pencere genişliği
-    height: 670, // pencere yüksekliği
-    show: false, // pencere hazır olana kadar gösterilmesin
-    autoHideMenuBar: true, // menü çubuğunu gizle
-    ...(process.platform === 'linux' ? { icon } : {}), // yalnızca Linux için ikon kullan
+    width: 900,
+    height: 670,
+    show: false,
+    autoHideMenuBar: true,
+    ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'), // preload script dosyası
-      sandbox: false // sandbox özelliğini devre dışı bırak (gelişmiş erişim için)
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false
     }
   })
 
-  // Pencere yüklendiğinde göster
+  // Pencere hazır olduğunda göster
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
-  // Yeni pencere açma isteği gelirse dış tarayıcıda aç (örn. linklere tıklama)
+  // Pencerede link tıklanırsa varsayılan tarayıcıda aç
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url) // tarayıcıda aç
-    return { action: 'deny' } // Electron içinde pencere açılmasını engelle
+    shell.openExternal(details.url)
+    return { action: 'deny' }
   })
 
-  // Geliştirme ortamındaysa local sunucu URL'sini yükle (vite dev server)
+  // Geliştirme modundaysa Vite sunucusunu yükle
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    // Üretim ortamındaysa derlenmiş HTML dosyasını yükle
+    // Üretim modundaysa HTML dosyasını yükle
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  // 🟡 Electron autoUpdater ile güncelleme kontrolü başlatılır
-  autoUpdater.checkForUpdatesAndNotify()
-
-  // Güncelleme mevcutsa consola yaz
-  autoUpdater.on('update-available', () => {
-    console.log('🔁 Yeni güncelleme mevcut, indiriliyor...')
-  })
-
-  // Güncelleme indirildikten sonra
-  autoUpdater.on('update-downloaded', () => {
-    console.log('✅ Güncelleme indirildi. Uygulama kapatıldığında kurulacak.')
-    // Otomatik kurulum yapılması istenirse aşağıdaki satır açılabilir:
-    // autoUpdater.quitAndInstall();
-  })
-
-  // Güncelleme sırasında hata olursa consola yaz
-  autoUpdater.on('error', (err) => {
-    console.error('⚠️ Güncelleme sırasında hata oluştu:', err)
-  })
+  // 🔄 Güncelleme sistemini başlat
+  initAutoUpdater()
 }
 
 // Uygulama Electron tarafından tamamen yüklendiğinde çalışır
 app.whenReady().then(() => {
-  // Windows için uygulama modeli kimliği ayarlanır (gerekli)
+  // Windows için uygulama modeli kimliği ayarlanır (bildirim için önemli)
   electronApp.setAppUserModelId('com.electron')
 
-  // Pencere oluşturulurken F12 ve kısayolların davranışları belirlenir
+  // Pencere oluşturulurken kısayollar tanımlanır (F12 vs.)
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Basit IPC örneği: Renderer'dan 'ping' geldiğinde consola 'pong' yaz
+  // IPC test: Renderer'dan 'ping' mesajı geldiğinde consola 'pong' yaz
   ipcMain.on('ping', () => console.log('pong'))
 
-  // Ana pencere oluşturulur
+  // Ana pencere oluştur
   createWindow()
 
   // MacOS'ta uygulama simgesine tıklanırsa yeni pencere oluştur
-  app.on('activate', function () {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// Tüm pencereler kapatıldığında uygulamayı sonlandır (Mac hariç)
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
 })
 
 // Tüm pencereler kapatıldığında uygulamayı sonlandır (Mac hariç)
