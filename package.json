@@ -6,10 +6,10 @@
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
+    "dev": "electron-vite dev",
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
-    "dev": "electron-vite dev",
     "build": "electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
@@ -37,5 +37,16 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "vite": "^7.0.5"
+  },
+  "build": {
+    "appId": "com.lampp.dev",
+    "productName": "LamppDev",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Eren-Seyfi",
+        "repo": "lampp-dev"
+      }
+    ]
   }
 }
